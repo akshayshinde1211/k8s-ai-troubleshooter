@@ -1,9 +1,9 @@
 # Kubernetes AI-Powered Cluster Troubleshooter
 
-A read-only Python CLI for diagnosing unhealthy Kubernetes pods. It discovers
-explicit pod failure signals, gathers focused API evidence, applies deterministic
-Kubernetes rules, and can optionally use Google Gemini for evidence-bounded
-investigation guidance.
+A read-only Python CLI for diagnosing unhealthy Kubernetes pods with Google
+Gemini. It discovers explicit pod failure signals, gathers focused API evidence,
+applies deterministic Kubernetes rules, and sends the bounded evidence to Gemini
+for root-cause analysis and manual remediation guidance.
 
 ## What it does
 
@@ -13,9 +13,9 @@ investigation guidance.
    and excessive restarts.
 3. Collects pod conditions, container state, recent events, current logs, and
    previous logs for restarted containers.
-4. Runs deterministic rules before any AI request.
-5. Optionally sends the bounded, structured evidence to Gemini for additional
-   root-cause guidance. The tool never modifies Kubernetes resources.
+4. Runs deterministic rules before every Gemini request.
+5. Sends bounded, structured evidence to Gemini for root-cause guidance. The
+   tool never modifies Kubernetes resources.
 
 ## Quick start
 
@@ -25,6 +25,8 @@ cd k8s-ai-troubleshooter
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+cp .env.example .env
+# Set GEMINI_API_KEY in .env
 python main.py check-connectivity
 python main.py scan
 ```
@@ -54,25 +56,26 @@ python main.py scan
 Expected deterministic categories include `APPLICATION_RUNTIME`, `IMAGE`, and
 `SCHEDULING`.
 
-## Optional Gemini analysis
+## Gemini configuration
 
-The deterministic diagnosis works without an API key. To add Gemini analysis,
-copy `.env.example` to `.env`, set `GEMINI_API_KEY`, and opt in explicitly:
+`GEMINI_API_KEY` is required for every `scan` command. Copy `.env.example` to
+`.env` and set the API key:
 
 ```bash
-python main.py scan --namespace default --ai
+python main.py scan --namespace default
 ```
 
 Use `--model` to select a different Gemini model. Only bounded pod evidence is
 sent: relevant status, conditions, recent events, truncated logs, and the
-deterministic result. The prompt prohibits the model from inventing evidence.
+deterministic result. The prompt prohibits the model from inventing evidence or
+claiming that it applied remediation.
 
 ## Read-only safety model
 
 The CLI only reads Kubernetes information. It never deletes pods, patches
 workloads, scales deployments, executes commands in containers, or changes
-ConfigMaps and Secrets. AI output is advisory; an operator approves and applies
-any remediation.
+ConfigMaps and Secrets. Gemini identifies the likely cause and recommended
+remediation; an operator reviews and applies the change.
 
 ## In-cluster RBAC
 
@@ -93,13 +96,14 @@ kubectl apply -f manifests/rolebinding.yaml
 To run it in Kubernetes, build and publish an image, replace the placeholder
 image in `manifests/deployment.yaml`, then apply the deployment manifest. No API
 key is baked into the image; provide `GEMINI_API_KEY` through your secret
-management process only when AI analysis is required.
+management process for every scan.
 
 ## Container image
 
 ```bash
 docker build -t k8s-ai-troubleshooter:local .
-docker run --rm -v "$HOME/.kube:/home/app/.kube:ro" k8s-ai-troubleshooter:local scan
+docker run --rm --env-file .env -v "$HOME/.kube:/home/app/.kube:ro" \
+  k8s-ai-troubleshooter:local scan
 ```
 
 The image runs as a non-root user. For a local kubeconfig mount, ensure the
@@ -122,7 +126,7 @@ cluster.
   still be unhealthy when a container is not ready or restarting.
 - Previous logs matter because the container that failed may no longer be the
   currently running instance.
-- Rules run first to provide reliable diagnosis when Gemini is unavailable and
-  to reduce the evidence sent to the model.
+- Rules run first to give Gemini a deterministic evidence baseline and reduce
+  the amount of data sent to the model.
 - The failure lab remains separate so test failures are reproducible without
   coupling application code to Kubernetes manifests.

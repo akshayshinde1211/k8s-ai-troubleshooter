@@ -43,7 +43,7 @@ def print_diagnosis(pod: PodEvidence, rule: RuleResult, ai_result: AiResult | No
         console.print(command)
 
     if ai_result and ai_result.text:
-        console.print(Panel(ai_result.text, title="Optional Gemini analysis"))
+        console.print(Panel(ai_result.text, title="Gemini analysis"))
     elif ai_result and ai_result.error:
-        console.print(f"[yellow]Gemini analysis unavailable: {ai_result.error}[/yellow]")
+        console.print(f"[yellow]Gemini analysis failed: {ai_result.error}[/yellow]")
     console.print()

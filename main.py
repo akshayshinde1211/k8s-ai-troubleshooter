@@ -1,66 +1,81 @@
-"""Command-line entry point for Kubernetes connectivity checks."""
+"""Read-only CLI for diagnosing unhealthy Kubernetes pods."""
 
 from __future__ import annotations
 
 import argparse
 import sys
 
-from kubernetes import client, config
+from dotenv import load_dotenv
 from kubernetes.client.exceptions import ApiException
 from kubernetes.config.config_exception import ConfigException
 
+from troubleshooter.ai_analyzer import DEFAULT_MODEL, analyze_with_gemini
+from troubleshooter.collector import collect_pod_evidence
+from troubleshooter.detector import find_unhealthy_pods
+from troubleshooter.kubernetes_client import (
+    get_apps_api,
+    get_core_api,
+    list_pods,
+    load_kubernetes_configuration,
+)
+from troubleshooter.output import console, print_diagnosis, print_scan_summary
+from troubleshooter.rules import analyze_pod
 
-def load_kubernetes_configuration() -> None:
-    """Load the active local kubeconfig used by kubectl."""
-    config.load_kube_config()
+
+def check_connectivity(namespace: str | None) -> int:
+    authentication_source = load_kubernetes_configuration()
+    pods = list_pods(get_core_api(), namespace)
+    console.print("Kubernetes API connectivity check succeeded.")
+    console.print(f"Authentication: {authentication_source}")
+    console.print(f"Retrieved {len(pods)} pod(s).")
+    return 0
 
 
-def check_connectivity() -> int:
-    """Verify Kubernetes API access and display a small pod summary."""
-    try:
-        load_kubernetes_configuration()
-        core_api = client.CoreV1Api()
-        pod_list = core_api.list_pod_for_all_namespaces(limit=10)
-    except ConfigException as error:
-        print("Could not load a Kubernetes kubeconfig.")
-        print(f"Details: {error}")
-        return 1
-    except ApiException as error:
-        print("Connected configuration could not access the Kubernetes API.")
-        print(f"Status: {error.status}")
-        print(f"Reason: {error.reason}")
-        return 1
+def scan(namespace: str | None, use_ai: bool, model: str) -> int:
+    authentication_source = load_kubernetes_configuration()
+    core_api = get_core_api()
+    apps_api = get_apps_api()
+    pods = list_pods(core_api, namespace)
+    unhealthy_pods = find_unhealthy_pods(pods)
 
-    print("Kubernetes API connectivity check succeeded.")
-    print(f"Retrieved {len(pod_list.items)} pod(s) in this response.")
+    console.print(f"Authentication: {authentication_source}")
+    print_scan_summary(len(pods), len(unhealthy_pods), namespace)
+    if not unhealthy_pods:
+        console.print("[green]No pods with explicit failure signals were found.[/green]")
+        return 0
 
-    for pod in pod_list.items:
-        print(f"- {pod.metadata.namespace}/{pod.metadata.name}: {pod.status.phase}")
-
-    if pod_list.metadata._continue:
-        print("Additional pods exist but are not shown in this initial response.")
-
+    for pod in unhealthy_pods:
+        evidence = collect_pod_evidence(core_api, apps_api, pod)
+        rule_result = analyze_pod(evidence)
+        ai_result = analyze_with_gemini(evidence, rule_result, model) if use_ai else None
+        print_diagnosis(evidence, rule_result, ai_result)
     return 0
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        description="Verify connectivity to the current Kubernetes cluster."
-    )
+    parser = argparse.ArgumentParser(description="Read-only Kubernetes pod troubleshooting.")
+    parser.add_argument("command", choices=["scan", "check-connectivity"])
+    parser.add_argument("--namespace", help="Limit the scan to one namespace.")
     parser.add_argument(
-        "command",
-        choices=["check-connectivity"],
-        help="Run the Kubernetes API connectivity check.",
+        "--ai",
+        action="store_true",
+        help="Request optional Gemini analysis after deterministic rules run.",
     )
+    parser.add_argument("--model", default=DEFAULT_MODEL, help="Gemini model name.")
     return parser
 
 
 def main() -> int:
+    load_dotenv()
     arguments = build_parser().parse_args()
-
-    if arguments.command == "check-connectivity":
-        return check_connectivity()
-
+    try:
+        if arguments.command == "check-connectivity":
+            return check_connectivity(arguments.namespace)
+        return scan(arguments.namespace, arguments.ai, arguments.model)
+    except ConfigException as error:
+        console.print(f"[red]Kubernetes authentication failed: {error}[/red]")
+    except ApiException as error:
+        console.print(f"[red]Kubernetes API error {error.status}: {error.reason}[/red]")
     return 1
 
 

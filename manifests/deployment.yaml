@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: k8s-ai-troubleshooter
+  labels:
+    app: k8s-ai-troubleshooter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: k8s-ai-troubleshooter
+  template:
+    metadata:
+      labels:
+        app: k8s-ai-troubleshooter
+    spec:
+      serviceAccountName: k8s-ai-troubleshooter
+      containers:
+        - name: troubleshooter
+          image: your-registry/k8s-ai-troubleshooter:latest
+          imagePullPolicy: IfNotPresent
+          args:
+            - scan
+            - --namespace
+            - default
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop:
+                - ALL

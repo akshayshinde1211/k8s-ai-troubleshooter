@@ -1,23 +1,23 @@
 # Kubernetes AI-Powered Cluster Troubleshooter
 
-A Python command-line project for investigating unhealthy Kubernetes workloads.
-It will discover problematic pods, collect focused diagnostic evidence, apply
-deterministic Kubernetes rules, and optionally request AI-assisted analysis.
+A read-only Python CLI for diagnosing unhealthy Kubernetes pods. It discovers
+explicit pod failure signals, gathers focused API evidence, applies deterministic
+Kubernetes rules, and can optionally use Google Gemini for evidence-bounded
+investigation guidance.
 
-The first milestone establishes a reliable local connection to the Kubernetes API.
-Automated troubleshooting and AI integration are intentionally out of scope for
-this stage.
+## What it does
 
-## Prerequisites
+1. Authenticates with local kubeconfig or an in-cluster ServiceAccount.
+2. Finds pods with concrete failure signals such as `CrashLoopBackOff`, image
+   pull errors, unschedulable Pending state, `OOMKilled`, configuration errors,
+   and excessive restarts.
+3. Collects pod conditions, container state, recent events, current logs, and
+   previous logs for restarted containers.
+4. Runs deterministic rules before any AI request.
+5. Optionally sends the bounded, structured evidence to Gemini for additional
+   root-cause guidance. The tool never modifies Kubernetes resources.
 
-- Python 3.10 or newer
-- `kubectl` configured for the cluster you want to inspect
-- Permission to list pods across namespaces
-
-## Clone and run in your cluster
-
-From a shell with access to the cluster, clone the repository and prepare the
-Python environment:
+## Quick start
 
 ```bash
 git clone https://github.com/akshayshinde1211/k8s-ai-troubleshooter.git
@@ -25,40 +25,104 @@ cd k8s-ai-troubleshooter
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+python main.py check-connectivity
+python main.py scan
 ```
 
-On Windows PowerShell, activate the virtual environment with:
-
-```powershell
-.venv\Scripts\Activate.ps1
-```
-
-## Verify Kubernetes API connectivity
-
-The connectivity command reads the same active kubeconfig context used by
-`kubectl`, calls the Kubernetes API, and prints up to ten pods returned by the
-cluster.
+Limit scanning to one namespace when appropriate:
 
 ```bash
-python main.py check-connectivity
+python main.py scan --namespace default
 ```
 
-Expected output begins with:
+The CLI loads the current kubeconfig first. When it runs in Kubernetes, it falls
+back to in-cluster ServiceAccount authentication.
 
-```text
-Kubernetes API connectivity check succeeded.
-Retrieved <number> pod(s) in this response.
+## Test with the lab
+
+Create controlled failures using the separate lab repository:
+
+```bash
+git clone https://github.com/akshayshinde1211/k8s-troubleshooting-lab.git
+kubectl apply -f k8s-troubleshooting-lab/healthy/nginx.yaml
+kubectl apply -f k8s-troubleshooting-lab/scenarios/crashloop/deployment.yaml
+kubectl apply -f k8s-troubleshooting-lab/scenarios/imagepull/deployment.yaml
+kubectl apply -f k8s-troubleshooting-lab/scenarios/pending/deployment.yaml
+python main.py scan
 ```
 
-If it cannot load kubeconfig or the current identity lacks API access, the command
-prints the Kubernetes error and exits with a non-zero status.
+Expected deterministic categories include `APPLICATION_RUNTIME`, `IMAGE`, and
+`SCHEDULING`.
 
-## Configuration
+## Optional Gemini analysis
 
-Copy `.env.example` to `.env` only when a later AI integration milestone requires
-it. Do not commit `.env`; it is excluded by `.gitignore`.
+The deterministic diagnosis works without an API key. To add Gemini analysis,
+copy `.env.example` to `.env`, set `GEMINI_API_KEY`, and opt in explicitly:
 
-## Safety
+```bash
+python main.py scan --namespace default --ai
+```
 
-The project is read-only. It is intended to inspect Kubernetes resources and help
-an operator decide on remediation; it does not change workloads.
+Use `--model` to select a different Gemini model. Only bounded pod evidence is
+sent: relevant status, conditions, recent events, truncated logs, and the
+deterministic result. The prompt prohibits the model from inventing evidence.
+
+## Read-only safety model
+
+The CLI only reads Kubernetes information. It never deletes pods, patches
+workloads, scales deployments, executes commands in containers, or changes
+ConfigMaps and Secrets. AI output is advisory; an operator approves and applies
+any remediation.
+
+## In-cluster RBAC
+
+The `manifests/` directory provides namespace-scoped RBAC:
+
+- `pods`, `events`: list and get troubleshooting signals
+- `pods/log`: read current and previous container logs
+- `replicasets`, `deployments`: resolve owner context
+
+Apply the manifests to the namespace being inspected:
+
+```bash
+kubectl apply -f manifests/serviceaccount.yaml
+kubectl apply -f manifests/role.yaml
+kubectl apply -f manifests/rolebinding.yaml
+```
+
+To run it in Kubernetes, build and publish an image, replace the placeholder
+image in `manifests/deployment.yaml`, then apply the deployment manifest. No API
+key is baked into the image; provide `GEMINI_API_KEY` through your secret
+management process only when AI analysis is required.
+
+## Container image
+
+```bash
+docker build -t k8s-ai-troubleshooter:local .
+docker run --rm -v "$HOME/.kube:/home/app/.kube:ro" k8s-ai-troubleshooter:local scan
+```
+
+The image runs as a non-root user. For a local kubeconfig mount, ensure the
+mounted file is readable by the container user or use an in-cluster deployment.
+
+## Tests
+
+```bash
+pytest
+```
+
+The tests cover the deterministic category mapping independently of a live
+cluster.
+
+## Design choices
+
+- The Kubernetes Python client provides typed API access and avoids fragile
+  parsing of `kubectl` output.
+- Pod phase and container state are evaluated separately: a `Running` pod can
+  still be unhealthy when a container is not ready or restarting.
+- Previous logs matter because the container that failed may no longer be the
+  currently running instance.
+- Rules run first to provide reliable diagnosis when Gemini is unavailable and
+  to reduce the evidence sent to the model.
+- The failure lab remains separate so test failures are reproducible without
+  coupling application code to Kubernetes manifests.

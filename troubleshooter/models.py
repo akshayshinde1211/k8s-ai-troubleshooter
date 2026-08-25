@@ -28,6 +28,8 @@ class PodEvidence:
     owners: list[str]
     workload_context: list[str]
     events: list[str]
+    configured_images: dict[str, str]
+    resource_requests: dict[str, dict[str, str]]
     logs: dict[str, str]
     previous_logs: dict[str, str]
     log_errors: list[str] = field(default_factory=list)

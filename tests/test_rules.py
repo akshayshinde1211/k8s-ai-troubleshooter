@@ -13,6 +13,8 @@ def make_pod(**overrides) -> PodEvidence:
         "owners": [],
         "workload_context": [],
         "events": [],
+        "configured_images": {},
+        "resource_requests": {},
         "logs": {},
         "previous_logs": {},
     }
@@ -51,9 +53,13 @@ def test_image_pull_failure_is_image_category():
                 waiting_reason="ImagePullBackOff",
             )
         ],
+        configured_images={"api": "nginx:this-tag-does-not-exist"},
     )
 
-    assert analyze_pod(pod).category == "IMAGE"
+    result = analyze_pod(pod)
+
+    assert result.category == "IMAGE"
+    assert "nginx:this-tag-does-not-exist" in " ".join(result.evidence)
 
 
 def test_unschedulable_pending_pod_is_scheduling_category():
@@ -67,9 +73,13 @@ def test_unschedulable_pending_pod_is_scheduling_category():
                 "message": "Insufficient memory",
             }
         ],
+        resource_requests={"api": {"cpu": "128", "memory": "512Gi"}},
     )
 
-    assert analyze_pod(pod).category == "SCHEDULING"
+    result = analyze_pod(pod)
+
+    assert result.category == "SCHEDULING"
+    assert "512Gi" in " ".join(result.evidence)
 
 
 def test_oomkilled_is_resource_category():

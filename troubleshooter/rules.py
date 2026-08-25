@@ -74,10 +74,14 @@ def analyze_pod(pod: PodEvidence) -> RuleResult:
         pod, "ErrImagePull"
     )
     if image_evidence:
+        configured_images = [
+            f"Container {name} is configured with image {image}."
+            for name, image in pod.configured_images.items()
+        ]
         return RuleResult(
             category="IMAGE",
             summary="Kubernetes cannot pull the configured container image.",
-            evidence=image_evidence + pod.events[-3:],
+            evidence=image_evidence + configured_images + pod.events[-3:],
             investigation_steps=[
                 "Verify the image name and tag in the workload specification.",
                 "Check registry credentials and network access if the image is private.",
@@ -113,10 +117,14 @@ def analyze_pod(pod: PodEvidence) -> RuleResult:
         scheduling_events = [
             event for event in pod.events if "insufficient" in event.lower() or "schedul" in event.lower()
         ]
+        requested_resources = [
+            f"Container {name} requests {requests}."
+            for name, requests in pod.resource_requests.items()
+        ]
         return RuleResult(
             category="SCHEDULING",
             summary="The pod cannot be scheduled onto an available node.",
-            evidence=["Pod phase is Pending."] + scheduling_events[-3:],
+            evidence=["Pod phase is Pending."] + requested_resources + scheduling_events[-3:],
             investigation_steps=[
                 "Compare requested CPU and memory with allocatable node capacity.",
                 "Check node selectors, taints, tolerations, and affinity rules.",

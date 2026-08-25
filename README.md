@@ -66,9 +66,9 @@ python main.py scan --namespace default
 ```
 
 Use `--model` to select a different Gemini model. Only bounded pod evidence is
-sent: relevant status, conditions, recent events, truncated logs, and the
-deterministic result. The prompt prohibits the model from inventing evidence or
-claiming that it applied remediation.
+sent: relevant status, configured images, resource requests, conditions, recent
+events, truncated logs, and the deterministic result. The prompt prohibits the
+model from inventing evidence or claiming that it applied remediation.
 
 ## Read-only safety model
 

@@ -145,6 +145,22 @@ def _collect_logs(core_api, pod, containers: list[ContainerEvidence]):
     return logs, previous_logs, errors
 
 
+def _configured_images(pod) -> dict[str, str]:
+    return {
+        container.name: container.image
+        for container in pod.spec.containers or []
+        if container.image
+    }
+
+
+def _resource_requests(pod) -> dict[str, dict[str, str]]:
+    requests: dict[str, dict[str, str]] = {}
+    for container in pod.spec.containers or []:
+        if container.resources and container.resources.requests:
+            requests[container.name] = dict(container.resources.requests)
+    return requests
+
+
 def collect_pod_evidence(core_api, apps_api, pod) -> PodEvidence:
     """Collect the minimum useful evidence for diagnosis of one pod."""
     statuses = (pod.status.init_container_statuses or []) + (
@@ -166,6 +182,8 @@ def collect_pod_evidence(core_api, apps_api, pod) -> PodEvidence:
         owners=owners,
         workload_context=_workload_context(apps_api, pod),
         events=_pod_events(core_api, pod),
+        configured_images=_configured_images(pod),
+        resource_requests=_resource_requests(pod),
         logs=logs,
         previous_logs=previous_logs,
         log_errors=log_errors,

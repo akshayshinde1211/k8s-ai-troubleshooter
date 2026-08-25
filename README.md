@@ -20,15 +20,12 @@ From a shell with access to the cluster, clone the repository and prepare the
 Python environment:
 
 ```bash
-git clone https://github.com/<your-github-username>/k8s-ai-troubleshooter.git
+git clone https://github.com/akshayshinde1211/k8s-ai-troubleshooter.git
 cd k8s-ai-troubleshooter
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 ```
-
-Replace `<your-github-username>` with your GitHub username after publishing the
-repository.
 
 On Windows PowerShell, activate the virtual environment with:
 

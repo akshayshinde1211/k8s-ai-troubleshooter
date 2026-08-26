@@ -9,7 +9,7 @@ from google import genai
 
 from .models import AiResult, PodEvidence, RuleResult
 
-DEFAULT_MODEL = "gemini-3.7-flash"
+DEFAULT_MODEL = "gemini-3.6-flash"
 
 
 class GeminiConfigurationError(RuntimeError):
@@ -42,8 +42,12 @@ Useful kubectl commands; Recommended remediation; Confidence.
 The CLI is read-only. Recommend manual, reversible changes only; do not imply
 that you applied any remediation.
 
-Deterministic rule result:
-{json.dumps(rule_result.__dict__, indent=2)}
+Deterministic classification and evidence:
+{json.dumps({
+    "category": rule_result.category,
+    "summary": rule_result.summary,
+    "evidence": rule_result.evidence,
+}, indent=2)}
 
 Collected pod evidence:
 {json.dumps(pod.to_dict(), indent=2)}

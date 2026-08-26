@@ -1,4 +1,4 @@
-"""Terminal rendering for deterministic and optional AI diagnoses."""
+"""Terminal rendering for Kubernetes evidence and Gemini diagnoses."""
 
 from __future__ import annotations
 
@@ -35,13 +35,6 @@ def print_diagnosis(pod: PodEvidence, rule: RuleResult, ai_result: AiResult | No
     console.print("[bold]Evidence[/bold]")
     for item in rule.evidence:
         console.print(f"- {item}")
-    console.print("[bold]Recommended investigation[/bold]")
-    for index, item in enumerate(rule.investigation_steps, start=1):
-        console.print(f"{index}. {item}")
-    console.print("[bold]Commands[/bold]")
-    for command in rule.commands:
-        console.print(command)
-
     if ai_result and ai_result.text:
         console.print(Panel(ai_result.text, title="Gemini analysis"))
     elif ai_result and ai_result.error:

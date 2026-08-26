@@ -46,10 +46,9 @@ Create controlled failures using the separate lab repository:
 
 ```bash
 git clone https://github.com/akshayshinde1211/k8s-troubleshooting-lab.git
-kubectl apply -f k8s-troubleshooting-lab/healthy/nginx.yaml
-kubectl apply -f k8s-troubleshooting-lab/scenarios/crashloop/deployment.yaml
-kubectl apply -f k8s-troubleshooting-lab/scenarios/imagepull/deployment.yaml
-kubectl apply -f k8s-troubleshooting-lab/scenarios/pending/deployment.yaml
+cd k8s-troubleshooting-lab/labs
+kubectl apply -f .
+cd ../../k8s-ai-troubleshooter
 python main.py scan
 ```
 

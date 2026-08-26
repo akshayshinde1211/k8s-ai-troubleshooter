@@ -53,7 +53,7 @@ def scan(namespace: str | None, model: str) -> int:
     for pod in unhealthy_pods:
         evidence = collect_pod_evidence(core_api, apps_api, pod)
         rule_result = analyze_pod(evidence)
-        ai_result = analyze_with_gemini(evidence, rule_result, model)
+        ai_result = analyze_with_gemini(evidence, model)
         print_diagnosis(evidence, rule_result, ai_result)
     return 0
 

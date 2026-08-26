@@ -7,7 +7,7 @@ import os
 
 from google import genai
 
-from .models import AiResult, PodEvidence, RuleResult
+from .models import AiResult, PodEvidence
 
 DEFAULT_MODEL = "gemini-3.6-flash"
 
@@ -25,10 +25,8 @@ def require_gemini_api_key() -> str:
     return api_key
 
 
-def analyze_with_gemini(
-    pod: PodEvidence, rule_result: RuleResult, model: str = DEFAULT_MODEL
-) -> AiResult:
-    """Request evidence-bounded Gemini advice after deterministic analysis."""
+def analyze_with_gemini(pod: PodEvidence, model: str = DEFAULT_MODEL) -> AiResult:
+    """Request Gemini advice using collected Kubernetes evidence only."""
     api_key = require_gemini_api_key()
 
     prompt = f"""You are assisting a Kubernetes operator. Use only the evidence provided.
@@ -41,13 +39,6 @@ Useful kubectl commands; Recommended remediation; Confidence.
 
 The CLI is read-only. Recommend manual, reversible changes only; do not imply
 that you applied any remediation.
-
-Deterministic classification and evidence:
-{json.dumps({
-    "category": rule_result.category,
-    "summary": rule_result.summary,
-    "evidence": rule_result.evidence,
-}, indent=2)}
 
 Collected pod evidence:
 {json.dumps(pod.to_dict(), indent=2)}

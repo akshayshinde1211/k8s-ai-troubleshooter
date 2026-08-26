@@ -13,10 +13,11 @@ for root-cause analysis and manual remediation guidance.
    and excessive restarts.
 3. Collects pod conditions, container state, recent events, current logs, and
    previous logs for restarted containers.
-4. Runs deterministic rules to classify the Kubernetes signals before every
-   Gemini request.
-5. Sends bounded, structured evidence to Gemini for the investigation steps,
-   commands, root-cause guidance, and manual remediation. The
+4. Runs deterministic rules to classify Kubernetes signals for the terminal
+   display.
+5. Sends only bounded, structured Kubernetes evidence to Gemini. Gemini
+   generates the investigation steps, commands, root-cause guidance, and
+   manual remediation suggestions. The
    tool never modifies Kubernetes resources.
 
 ## Quick start
@@ -69,8 +70,10 @@ python main.py scan --namespace default
 The default model is `gemini-3.6-flash`; use `--model` to select a different
 Gemini model. Only bounded pod evidence is
 sent: relevant status, configured images, resource requests, conditions, recent
-events, truncated logs, and the deterministic result. The prompt prohibits the
-model from inventing evidence or claiming that it applied remediation.
+events, and truncated logs. Python-generated classifications, investigation
+steps, commands, and remediation suggestions are not sent. The prompt
+prohibits the model from inventing evidence or claiming that it applied
+remediation.
 
 ## Read-only safety model
 

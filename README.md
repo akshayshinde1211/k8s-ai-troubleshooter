@@ -43,6 +43,30 @@ python main.py scan --namespace default
 The CLI loads the current kubeconfig first. When it runs in Kubernetes, it falls
 back to in-cluster ServiceAccount authentication.
 
+## Demo
+
+The tool scans a cluster containing unhealthy workloads and reports the
+Kubernetes evidence used for each diagnosis.
+
+<img src="docs/images/cluster-workloads.png" alt="Kubernetes pods showing configuration, image pull, pending, crash loop, and health probe failures" width="900">
+
+For a configuration failure, the CLI surfaces the failed pod state and the
+relevant Kubernetes event. Gemini then explains the missing ConfigMap reference,
+provides investigation commands, and recommends a manual remediation.
+
+<img src="docs/images/config-error-diagnosis.png" alt="Configuration error diagnosis with Kubernetes evidence and Gemini analysis" width="900">
+
+The same evidence-driven workflow diagnoses a CrashLoopBackOff workload and
+uses the container state, restart count, events, and logs to explain the likely
+startup failure.
+
+<img src="docs/images/crashloop-diagnosis.png" alt="CrashLoopBackOff diagnosis with Kubernetes evidence and Gemini analysis" width="900">
+
+The Gemini API usage dashboard confirms requests made by the CLI through
+Gemini 3.6 Flash.
+
+<img src="docs/images/gemini-usage.png" alt="Google AI Studio dashboard showing Gemini 3.6 Flash API usage" width="900">
+
 ## Test with the lab
 
 Create controlled failures using the separate lab repository:
@@ -131,7 +155,7 @@ cluster.
   still be unhealthy when a container is not ready or restarting.
 - Previous logs matter because the container that failed may no longer be the
   currently running instance.
-- Rules run first to give Gemini a deterministic evidence baseline and reduce
-  the amount of data sent to the model.
+- Rules run locally to classify Kubernetes signals for the terminal display;
+  Gemini receives only the collected Kubernetes evidence.
 - The failure lab remains separate so test failures are reproducible without
   coupling application code to Kubernetes manifests.
